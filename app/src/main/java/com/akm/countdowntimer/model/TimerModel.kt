@@ -1,10 +1,10 @@
 package com.akm.countdowntimer.model
 
 import java.time.Duration
+import java.util.concurrent.TimeUnit
 
 data class TimerModel(
-    val timeDuration: Duration = Duration.ofSeconds(30),
-    val remainingTime: Long = timeDuration.toMillis(),
+    val timeDuration: Long = 1500000,
     val status: Status = Status.STARTED,
     val toggle: ButtonState = ButtonState.START
 )

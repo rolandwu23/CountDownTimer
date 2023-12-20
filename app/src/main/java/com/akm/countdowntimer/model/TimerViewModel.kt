@@ -6,12 +6,15 @@ import androidx.annotation.RequiresApi
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import java.time.Duration
+import java.util.concurrent.TimeUnit
 
 class TimerViewModel : ViewModel() {
 
-    private val _viewState = MutableLiveData<TimerModel>()
-    val viewState: LiveData<TimerModel> = _viewState
+    private val _viewState = MutableStateFlow<TimerModel>(TimerModel())
+    val viewState: StateFlow<TimerModel> = _viewState
 
     var countDown: CountDownTimer? = null
 
@@ -19,12 +22,11 @@ class TimerViewModel : ViewModel() {
         _viewState.value = TimerModel()
     }
 
-    fun startTime(duration: Duration) {
-        countDown = object : CountDownTimer(duration.toMillis(), 1000) {
+    fun startTime(duration: Long) {
+        countDown = object : CountDownTimer(duration, 10) {
             override fun onTick(seconds: Long) {
                 _viewState.value = TimerModel(
-                    timeDuration = Duration.ofMillis(seconds),
-                    remainingTime = seconds,
+                    timeDuration = seconds,
                     status = Status.RUNNING,
                     toggle = ButtonState.PAUSE
                 )
@@ -32,7 +34,7 @@ class TimerViewModel : ViewModel() {
 
             override fun onFinish() {
                 _viewState.value = _viewState.value!!.copy(
-                    timeDuration = Duration.ZERO,
+                    timeDuration = 0,
                     status = Status.FINISHED,
                     toggle = ButtonState.START
                 )
@@ -54,7 +56,7 @@ class TimerViewModel : ViewModel() {
         countDown?.cancel()
         _viewState.value = _viewState.value!!.copy(
             status = Status.STARTED,
-            timeDuration = Duration.ofMillis(30000),
+            timeDuration = 30000,
             toggle = ButtonState.START
         )
     }

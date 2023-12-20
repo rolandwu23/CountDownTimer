@@ -18,18 +18,25 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.BasicText
 import androidx.compose.material.Icon
 import androidx.compose.material.IconButton
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.State
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorProducer
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -42,10 +49,16 @@ import com.akm.countdowntimer.ui.ext.format
 import kotlin.time.toJavaDuration
 
 @ExperimentalAnimationApi
-@RequiresApi(Build.VERSION_CODES.O)
 @Composable
 fun TimerHomeScreen(viewModel: TimerViewModel) {
-    val timer by viewModel.viewState.observeAsState(TimerModel())
+    val timer by viewModel.viewState.collectAsState(TimerModel())
+    val time = remember {
+        derivedStateOf { timer.timeDuration.format() }
+    }
+    val remainingTime = remember {
+        derivedStateOf { timer.timeDuration }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -56,23 +69,36 @@ fun TimerHomeScreen(viewModel: TimerViewModel) {
     ) {
         TimerHeader()
         Spacer(modifier = Modifier.height(25.dp))
-        TimerTopSection(timer.timeDuration.format(), timer.remainingTime)
+        TimerTopSection(
+            { time.value },
+            { remainingTime.value }
+        )
         Spacer(modifier = Modifier.height(25.dp))
         TimerButtons(viewModel)
     }
 }
 
 @Composable
-fun TimerTopSection(time: String, remainingTime: Long) {
-    val infiniteTransition = rememberInfiniteTransition(label = "")
-    val alpha by infiniteTransition.animateColor(
-        initialValue = Color.Red,
-        targetValue = Color.Green,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1000, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ), label = ""
-    )
+fun TimerTopSection(
+    time: () -> String,
+    remainingTime: () -> Long
+) {
+//    val infiniteTransition = rememberInfiniteTransition(label = "CountDownColor")
+//    val alpha by infiniteTransition.animateColor(
+//        initialValue = Color.Red,
+//        targetValue = Color.Green,
+//        animationSpec = infiniteRepeatable(
+//            animation = tween(1000, easing = LinearEasing),
+//            repeatMode = RepeatMode.Reverse
+//        ),
+//        label = "CountDownColorAlpha"
+//    )
+//    val color = remember {
+//        derivedStateOf {
+//            if (isTimeLessThan10Seconds(remainingTime())) alpha else Color.White
+//        }
+//    }
+    val color by animateColorBetween(remainingTime)
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -80,40 +106,74 @@ fun TimerTopSection(time: String, remainingTime: Long) {
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
-            text = time,
-            fontSize = 60.sp,
-            color = if (isTimeLessThan10Seconds(remainingTime)) alpha else Color.White
+        BasicText(
+            text = time(),
+            style = TextStyle(fontSize = 60.sp),
+            color = { color }
         )
     }
 }
 
+
+@Composable
+private fun animateColorBetween(
+    remainingTime: () -> Long
+): State<Color> {
+    val infiniteTransition = rememberInfiniteTransition(label = "CountDownColor")
+    val alpha by infiniteTransition.animateColor(
+        initialValue = Color.Red,
+        targetValue = Color.Green,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1000, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "CountDownColorAlpha"
+    )
+    val color = remember {
+        derivedStateOf {
+            if (isTimeLessThan10Seconds(remainingTime())) alpha else Color.White
+        }
+    }
+    return color
+}
+
 @ExperimentalAnimationApi
 @Composable
-fun TimerButtons(timerState: TimerViewModel) {
-    val toggle by timerState.viewState.observeAsState()
+fun TimerButtons(viewModel: TimerViewModel) {
+    val timer by viewModel.viewState.collectAsState(TimerModel())
+    val toggle = remember {
+        derivedStateOf { timer.toggle }
+    }
+
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically
     ) {
         IconButton(onClick = {
-            timerState.resetTimer()
+            viewModel.resetTimer()
         }) {
             Icon(painter = painterResource(R.drawable.ic_stop), contentDescription = "stop button")
         }
 
-        ButtonLayout(timerState)
+        ButtonLayout(
+            { toggle.value },
+            { viewModel.resetTimer() },
+            { viewModel.buttonSelection() }
+        )
     }
 }
 
 @Composable
-fun ButtonLayout(timerState: TimerViewModel) {
-    val toggle by timerState.viewState.observeAsState()
+fun ButtonLayout(
+    toggle: () -> ButtonState,
+    onResetClick: () -> Unit,
+    onButtonClick: () -> Unit
+) {
     var text = ""
     var color: Color = MaterialTheme.colors.primaryVariant
     var textColor: Color = Color.White
-    when (toggle?.toggle) {
+    when (toggle()) {
         ButtonState.START -> {
             text = "Start"
             color = MaterialTheme.colors.primaryVariant
@@ -140,7 +200,7 @@ fun ButtonLayout(timerState: TimerViewModel) {
 
         Box(modifier = Modifier
             .clickable {
-                timerState.resetTimer()
+                onResetClick()
             }
             .padding(30.dp)
             .size(80.dp)
@@ -156,7 +216,7 @@ fun ButtonLayout(timerState: TimerViewModel) {
 
         Box(modifier = Modifier
             .clickable {
-                timerState.buttonSelection()
+                onButtonClick()
             }
             .padding(10.dp)
             .size(80.dp)
